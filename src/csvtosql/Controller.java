@@ -34,6 +34,11 @@ public class Controller {
         if(conectar()){
             if(this.experto.cargarCSV(this.cliente)){
                 System.out.println("Se ha cargado correctamente el .csv");
+                if (this.moverCSV()){
+                    System.out.println("Se ha movido el .csv al contenedor correspondiente");
+                } else {
+                    System.out.println("No se ha podido mover el .csv");
+                }
                 desconectar();
                 return true;
             } else {
@@ -44,5 +49,9 @@ public class Controller {
         }
         System.out.println("No es posible conectarse a la DB");
         return false;
+    }
+    
+    public boolean moverCSV() throws IOException{
+        return experto.moverCSV();
     }
 }
