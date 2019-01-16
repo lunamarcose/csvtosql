@@ -2,7 +2,10 @@ package csvtosql;
 
 import config.GetPropertyValues;
 import db.PostgresHelper;
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -47,6 +50,42 @@ public class Expert {
         } catch (IOException e){
             e.printStackTrace();
         }
+        return true;
+    }
+    
+    public boolean verificarCSV() throws FileNotFoundException, IOException{
+        
+        // Obtengo los valores del archivo de propiedades
+        String csv_location = properties.getPropValue("csv_location");
+        
+        BufferedReader br = new BufferedReader(new FileReader(csv_location));
+        String line;
+            while((line=br.readLine())!=null){
+                String pattern = "^(\\d+),(\\w+),((\\w+)=(\\w+)),((\\w+)=(\\w+)+?"; //Regexp a aplicar
+                if(!line.matches(pattern)){
+                    return false;
+                }
+            }
+        return true;
+    }
+    
+    public boolean verificarExistenciaCSV() throws FileNotFoundException, IOException{
+        
+        // Obtengo los valores del archivo de propiedades
+        String csv_location = properties.getPropValue("csv_location");
+        
+        try {
+            BufferedReader br = new BufferedReader(new FileReader(csv_location));
+            return true;
+        } catch (FileNotFoundException e){
+            return false;
+        }
+    }
+    
+    public boolean verificarDatosAnteriores(){
+        // Falta agregar la lógica para conectarse a la db, verificar si la tabla intermedia
+        // es vacía, debe devolver true. Si contiene datos, es porque hubo error al procesar
+        // devuelve false
         return true;
     }
 }
