@@ -4,6 +4,7 @@ import config.GetPropertyValues;
 import java.io.IOException;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 
 public class PostgresHelper {
@@ -40,6 +41,10 @@ public class PostgresHelper {
         public void execUpdate(String query) throws SQLException {
             this.conn.createStatement().executeUpdate(query);
         }
+        
+        public ResultSet execQuery(String query) throws SQLException {
+	    return this.conn.createStatement().executeQuery(query);
+	}
         
         public boolean disconnect() throws SQLException{
             try {

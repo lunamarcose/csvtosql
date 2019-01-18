@@ -31,7 +31,7 @@ public class Controller {
     }
     
     public boolean cargarCSV() throws SQLException, IOException{
-        if(conectar()){
+        if(this.cliente != null){
             if(this.experto.cargarCSV(this.cliente)){
                 System.out.println("Se ha cargado correctamente el .csv");
                 desconectar();
@@ -58,10 +58,6 @@ public class Controller {
     }
     
     public boolean verificarCSV() throws IOException{
-        boolean existeCSV = experto.verificarExistenciaCSV();
-        if (existeCSV){
-            
-        }
         boolean estadoCSV = experto.verificarCSV();
         if(estadoCSV){
             System.out.println("El csv tiene el formato adecuado");
@@ -82,14 +78,19 @@ public class Controller {
         }
     }
     
-    public boolean verificarDatosAnteriores(){
-        boolean estadoDatosAnteriores = experto.verificarDatosAnteriores();
-        if(estadoDatosAnteriores){
-            System.out.println("La tabla se encuentra sin datos, es posible cargar el .csv");
-            return true;
-        } else {
-            System.out.println("La tabla posee datos previos. No es posible cargar el csv. Contacte soporte");
-            return false;
+    public boolean verificarDatosAnteriores() throws SQLException{
+        if(this.cliente != null){
+            int cantidadRegistrosAnteriores = experto.verificarDatosAnteriores(this.cliente);
+            if(cantidadRegistrosAnteriores == 0){
+                System.out.println("La tabla se encuentra sin datos, es posible cargar el .csv");
+                return true;
+            } else {
+                System.out.println("La tabla posee datos previos sin procesar (" + cantidadRegistrosAnteriores + "). Contacte soporte.");
+                desconectar();
+                return false;
+            }
         }
+        System.out.println("No es posible conectarse a la DB");
+        return false;
     }
 }
