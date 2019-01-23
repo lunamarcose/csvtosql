@@ -15,6 +15,8 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.StringTokenizer;
 
 public class Expert {
     
@@ -56,28 +58,38 @@ public class Expert {
     }
     
     public boolean verificarCSV() throws FileNotFoundException, IOException{       
-        // Obtengo los valores del archivo de propiedades
-        String csv_location = properties.getPropValue("csv_location");
         
+// Obtengo los valores del archivo de propiedades
+        String csv_location = properties.getPropValue("csv_location");
+        String[] nombres_columnas = properties.getPropValue("columns").split(",");
+        String[] nombres_columnas_req = properties.getPropValue("columns_required").split(",");
+        
+        // Cargo el csv, y verifico fila por fila: 1) cantidad de campos 2) 
         BufferedReader br = new BufferedReader(new FileReader(csv_location));
         boolean estadoCSV = true;
         String line;
             while((line=br.readLine())!=null){
                 String l = line.trim();
-                System.out.println(l);
-                String[] columnas = l.split(","); // separamos las lineas en las comas
+                String[] columnas = l.split(",", -1); // separamos las lineas en las comas
                 int cantidad_columnas = columnas.length;
-                System.out.println(cantidad_columnas);
-                if (cantidad_columnas == 23){ // Deben ser 23 campos
-                    for(int i=0; i < cantidad_columnas; i++){
-                        String valor = columnas[i].trim(); // Sin el espacio luego de la coma
-                        if(i == 0 || i == 1 || i == 2 || i == 3){
-                            if(valor.equals("")){
-                                System.out.println("Faltan valores requeridos");
-                                return false;
-                            }
-                        }
-                    }
+                if (cantidad_columnas == nombres_columnas.length){ // Deben ser la cantidad de campos definida en el archivo de config
+                    //HashMap<String,String> hashColumns = new HashMap<>();
+                    //for(int i=0; i < cantidad_columnas; i++){
+                        //String valor = columnas[i].trim(); // Sin el espacio luego de la coma
+                        //for(int j=0; j < nombres_columnas.length; j++){
+                            //hashColumns.put(nombres_columnas[j], valor);
+                        //}
+                        // Verifico que no existan columnas requeridas vacías
+                        //for(int k=0; k < nombres_columnas_req.length; k++){
+                            //String nombre_columna_req = nombres_columnas_req[k];
+                            //String hashValue = hashColumns.get(nombre_columna_req);
+                            //System.out.println(hashValue);
+                            //if(hashValue.equals("")){
+                                //System.out.println("Faltan valores requeridos: " + nombre_columna_req);
+                                //return false;
+                            //}
+                        //}
+                    //}
                 } else {
                     System.out.println("No tiene la cantidad de filas necesarias");
                     return false;
