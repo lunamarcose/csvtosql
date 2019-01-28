@@ -1,14 +1,19 @@
 package config;
 
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Date;
 import java.util.Properties;
+import org.jasypt.encryption.pbe.StandardPBEStringEncryptor;
+import org.jasypt.properties.EncryptableProperties;
  
 public class GetPropertyValues {
+    
     String result = "";
     InputStream inputStream;
+    StandardPBEStringEncryptor encryptor = new StandardPBEStringEncryptor();     
 
     public String getPropValues() throws IOException {
 
@@ -42,21 +47,22 @@ public class GetPropertyValues {
         return result;
     }
     
-    public String getPropValue(String property) throws IOException{
+    public String getPropValue(String property) throws IOException{        
         String property_value = "";
             try {
                 Properties prop = new Properties();
                 String propFileName = "config.properties";
-
                 inputStream = getClass().getClassLoader().getResourceAsStream(propFileName);
-
                 if (inputStream != null) {
                         prop.load(inputStream);
                 } else {
                         throw new FileNotFoundException("property file '" + propFileName + "' not found in the classpath");
-                }
-                
-                property_value = prop.getProperty(property);
+                }       
+                String cfg_file_loc = prop.getProperty("cfg_path");   
+                this.encryptor.setPassword("PASS"); // could be got from web, env variable...    
+                Properties propEnc = new EncryptableProperties(this.encryptor);  
+                propEnc.load(new FileInputStream(cfg_file_loc));
+                property_value = propEnc.getProperty(property);
             } catch (Exception e){
                 System.out.println("Exception: " + e);
             } finally {

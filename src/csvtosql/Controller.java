@@ -2,6 +2,7 @@ package csvtosql;
 
 import db.IndireccionPersistencia;
 import db.PostgresHelper;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.sql.SQLException;
 
@@ -92,5 +93,9 @@ public class Controller {
         }
         System.out.println("No es posible conectarse a la DB");
         return false;
+    }
+    
+    public boolean modificarCSV() throws IOException{
+        return experto.modificarCSV();
     }
 }
