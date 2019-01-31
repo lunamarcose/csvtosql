@@ -11,10 +11,35 @@ public class Controller {
     
     private PostgresHelper cliente;
     private Expert experto = new Expert();
+    private CSV csv;
     
+    // Inicia las verificaciones y posterior carga del archivo .csv
+    public void iniciarProceso() throws IOException, SQLException{
+        // Comienza el proceso de carga del CSV
+        // Verificamos el archivo de configuraciones
+        if(verificarEstadoConfig()){ // El archivo de configuración posee todos los datos cargados
+            // Verificamos exista el csv a procesar
+            // Si existe, devuelve el objeto
+            this.csv = verificarExistenciaCSV();
+            if(csv != null){ // Existe el csv a procesar
+                // Verificamos conexión con la DB
+                if(conectar()){ // Conectado OK
+                    // Verificamos el contenido del .csv
+                    if(verificarCSV(cliente,csv)){ // CSV correcto
+                        // Se procede a cargar el .csv
+                        if(cargarCSV(csv)){
+                            // Se mueve el csv al directorio de históricos
+                            moverCSV(csv);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    // Utilizado para conectarse a la base de datos destino
     public boolean conectar() throws SQLException, IOException{
         this.cliente = IndireccionPersistencia.conectar();
-        // Me conecto a la base de datos
         if(this.cliente != null){
             System.out.println("Conectado a la DB");
             return true;
@@ -22,6 +47,7 @@ public class Controller {
         return false;
     }
     
+    // Utilizado para desconectarse de la base de datos destino
     public boolean desconectar() throws SQLException{
         if(this.cliente != null){
             this.cliente.disconnect();
@@ -31,9 +57,9 @@ public class Controller {
         return false;
     }
     
-    public boolean cargarCSV() throws SQLException, IOException{
+    public boolean cargarCSV(CSV csv) throws SQLException, IOException{
         if(this.cliente != null){
-            if(this.experto.cargarCSV(this.cliente)){
+            if(this.experto.cargarCSV(this.cliente, csv)){
                 System.out.println("Se ha cargado correctamente el .csv");
                 desconectar();
                 return true;
@@ -47,8 +73,8 @@ public class Controller {
         return false;
     }
     
-    public boolean moverCSV() throws IOException{
-        boolean moveCompleted = experto.moverCSV();
+    public boolean moverCSV(CSV csv) throws IOException{
+        boolean moveCompleted = experto.moverCSV(csv);
         if (moveCompleted){
             System.out.println("Se ha movido el .csv al contenedor correspondiente");
             return true;
@@ -58,8 +84,8 @@ public class Controller {
         }
     }
     
-    public boolean verificarCSV() throws IOException{
-        boolean estadoCSV = experto.verificarCSV();
+    public boolean verificarCSV(PostgresHelper cliente, CSV csv) throws IOException, FileNotFoundException, SQLException{
+        boolean estadoCSV = experto.verificarCSV(cliente, csv).isIsValid();
         if(estadoCSV){
             System.out.println("El csv tiene el formato adecuado");
         } else {
@@ -68,34 +94,11 @@ public class Controller {
         return estadoCSV;
     }
     
-    public boolean verificarExistenciaCSV() throws IOException{
-        boolean existeCSV = experto.verificarExistenciaCSV();
-        if(existeCSV){
-            System.out.println("Se ha detectado el .csv en el directorio");
-            return true;
-        } else {
-            System.out.println("No se ha encontrado el .csv a procesar en el directorio");
-            return false;
-        }
+    public CSV verificarExistenciaCSV() throws IOException{
+        return experto.verificarExistenciaCSV();
     }
     
-    public boolean verificarDatosAnteriores() throws SQLException{
-        if(this.cliente != null){
-            int cantidadRegistrosAnteriores = experto.verificarDatosAnteriores(this.cliente);
-            if(cantidadRegistrosAnteriores == 0){
-                System.out.println("La tabla se encuentra sin datos, es posible cargar el .csv");
-                return true;
-            } else {
-                System.out.println("La tabla posee datos previos sin procesar (" + cantidadRegistrosAnteriores + "). Contacte soporte.");
-                desconectar();
-                return false;
-            }
-        }
-        System.out.println("No es posible conectarse a la DB");
-        return false;
-    }
-    
-    public boolean modificarCSV() throws IOException{
-        return experto.modificarCSV();
+    public boolean verificarEstadoConfig() throws IOException{
+        return experto.verificarEstadoConfig();
     }
 }
