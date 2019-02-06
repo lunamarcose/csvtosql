@@ -3,6 +3,7 @@ package csvtosql;
 public class CSV {
     private String fullPath;
     private boolean isValid;
+    private String isValid_motive;
     private int cantidadRegistros;
     private double porcentaje;
     
@@ -40,6 +41,14 @@ public class CSV {
 
     public void setPorcentaje(double porcentaje) {
         this.porcentaje = porcentaje;
+    }
+
+    public String getIsValid_motive() {
+        return isValid_motive;
+    }
+
+    public void setIsValid_motive(String isValid_motive) {
+        this.isValid_motive = isValid_motive;
     }
     
 }

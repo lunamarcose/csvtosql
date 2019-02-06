@@ -26,7 +26,7 @@ public class PostgresHelper {
 		this.pass = properties.getPropValue(pass);
 	}
 	
-	public boolean connect() throws SQLException, ClassNotFoundException {
+	public boolean connect() throws SQLException, ClassNotFoundException{
 		if (host.isEmpty() || dbName.isEmpty() || user.isEmpty() || pass.isEmpty()) {
 			throw new SQLException("Database credentials missing");
 		}

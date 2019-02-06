@@ -2,6 +2,7 @@ package csvtosql;
 
 import config.GetPropertyValues;
 import db.PostgresHelper;
+import dto.DTOConfig;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
@@ -18,10 +19,6 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
-import java.util.Timer;
-import java.util.TimerTask;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 public class Expert {
     
@@ -73,7 +70,6 @@ public class Expert {
         String csv_location_old = properties.getPropValue("csv_location_old");
         
         // Muevo .csv a otro directorio
-        File file = new File(csv_path);
         Path source = Paths.get(csv_path);
         Date fecha_actual= new Date();
         String fecha_actual_str = new SimpleDateFormat("yyyy-MM-dd").format(fecha_actual);
@@ -81,7 +77,7 @@ public class Expert {
         try {
             Files.move(source, target, StandardCopyOption.REPLACE_EXISTING);
         } catch (IOException e){
-            e.printStackTrace();
+            throw(e);
         }
         return true;
     }
@@ -118,13 +114,16 @@ public class Expert {
                 }
                 if(col_req_noVal.size() > 0){
                     csv.setIsValid(false);
+                    String mensajeError = "Los siguientes campos requeridos no poseen valor, para los registros en las filas:";
                     for(int i = 0; i < col_req_noVal.size(); i++){
-                        System.out.println("El campo requerido " + col_req_noVal.get(i) + " no posee valor en la fila número " + lineNumber);
+                        mensajeError += "\n" + lineNumber + " - " + col_req_noVal.get(i);
                     }
+                    csv.setIsValid_motive(mensajeError);
                     return csv;
                 }
             } else {
-                System.out.println("No tiene la cantidad de filas necesaria " + cantidad_columnas);
+                String mensajeError = "El registro " + lineNumber + " no tiene la cantidad de filas necesaria (" + cantidad_columnas + ")";
+                csv.setIsValid_motive(mensajeError);
                 csv.setIsValid(false);
                 return csv;
             }
@@ -203,40 +202,61 @@ public class Expert {
         return valores;
     }
     
-    public CSV verificarExistenciaCSV() throws FileNotFoundException, IOException{
+    public CSV verificarExistenciaCSV() throws IOException{
         
         // Obtengo los valores del archivo de propiedades
-        String csv_location = properties.getPropValue("csv_location");
-        
+        String csv_location = "";
+        try{
+            csv_location = properties.getPropValue("csv_location");
+        } catch (IOException e){
+            throw e;
+        }
         int cantidadCSV = 0;
         String nombreCSV = "";
         
-        File folder = new File(csv_location);
-        File[] listOfFiles = folder.listFiles();
-        for (int i = 0; i < listOfFiles.length; i++) {
-            if (listOfFiles[i].isFile()) {
-              String fileName = listOfFiles[i].getName();
-              if(fileName.endsWith(".csv")){
-                  cantidadCSV++;
-                  nombreCSV = fileName;
-              }
+        if(!csv_location.equals("")){
+            File folder = new File(csv_location);
+            File[] listOfFiles = folder.listFiles();
+            for (int i = 0; i < listOfFiles.length; i++) {
+                if (listOfFiles[i].isFile()) {
+                  String fileName = listOfFiles[i].getName();
+                  if(fileName.endsWith(".csv")){
+                      cantidadCSV++;
+                      nombreCSV = fileName;
+                  }
+                }
             }
+        } else {
+            return null;
         }
         
         if(cantidadCSV > 1){
-            System.out.println("ERROR: Existen más de 1 archivo CSV en el directorio");
             return null;
         } else if (cantidadCSV == 1){
             String fullPath = csv_location + "/" + nombreCSV;
             CSV csv = new CSV(fullPath);
             return csv;
         } else {
-            System.out.println("No existen CSV a procesar en el directorio.");
             return null;
         }
     }
     
-    public boolean verificarEstadoConfig() throws IOException{
-        return properties.getPropValues();
+    public DTOConfig verificarEstadoConfig() throws IOException{
+        try{
+            if(properties.getPropValues()){
+                String[] addresses = properties.getPropValue("columns").split(",");
+                return new DTOConfig(   properties.getPropValue("db_name"),
+                                        properties.getPropValue("csv_location"),
+                                        properties.getPropValue("csv_name"),
+                                        properties.getPropValue("csv_location_old"),
+                                        properties.getPropValue("intermediate_table"),
+                                        properties.getPropValue("aux_table"),
+                                        addresses);
+            } else {
+                return null;
+            }
+        } catch(IOException | NullPointerException e){
+            throw e;
+        }
     }
 }

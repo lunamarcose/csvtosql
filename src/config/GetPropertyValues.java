@@ -34,10 +34,13 @@ public class GetPropertyValues {
                         return false;
                     }
                 }
-        } catch (Exception e) {
-                System.out.println("Exception: " + e);
-        } finally {
-                inputStream.close();
+        } catch (IOException e) {
+            throw(e);
+        } catch (NullPointerException e){
+            throw(e);
+        }
+        finally {
+            inputStream.close();
         }
         return true;
     }
