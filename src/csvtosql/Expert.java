@@ -17,6 +17,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
 
@@ -24,37 +25,46 @@ public class Expert {
     
     GetPropertyValues properties = new GetPropertyValues();
     
-    public boolean cargarCSV(PostgresHelper cliente, CSV csv) throws IOException, SQLException, InterruptedException{
-        
-        // Obtengo los valores del archivo de propiedades
-        String tabla = properties.getPropValue("intermediate_table");
-        String tabla_aux = properties.getPropValue("aux_table");
-        String columnas = properties.getPropValue("columns");
+    /**
+    * Ejecuta la carga mediante el comando copy del .csv a la base de datos y tablas especificadas
+    * @param csv CSV, cliente PostgresHelper, dtoConfig DTOConfig
+    * @return boolean
+    */
+    public boolean cargarCSV(PostgresHelper cliente, CSV csv, DTOConfig dtoConfig) throws IOException, SQLException, InterruptedException{  
+        // Parámetros utilizados para el proceso de carga
+        String tabla = dtoConfig.getTabla_intermedia();
+        String tabla_aux = dtoConfig.getTabla_auxiliar();
+        String columnas = dtoConfig.getColumns();
         String tabla_columnas = tabla + "(" +columnas + ")";
         String location = csv.getFullPath();
         boolean procesoCompletado = false;
+        boolean incluir_columnas = Boolean.parseBoolean(properties.getPropValue("include_columns"));
+        String header_condition = "";
+        if(incluir_columnas){
+            header_condition = " HEADER"; // Se agrega al comando copy en caso de incluir encabezados
+        }
         
         // Se debe reiniciar la clave incremental antes de copiar el csv
-        //String query = "ALTER SEQUENCE idmhr.intermedia_pk_id_user_seq RESTART WITH 1";
+        //String query = "ALTER SEQUENCE idmhr.intermedia_pk_id_user_seq RESTART WITH 1"; -> Esto lo tiene que hacer desde el lado de la DB
         //cliente.execUpdate(query);
         // Query para ejecutar el copy
-        String query = "COPY " + tabla_columnas + " FROM " + "'" + location + "'" + "DELIMITER ',' QUOTE '\'\'' ESCAPE '\\' CSV;";
+        String query = "COPY " + tabla_columnas + " FROM " + "'" + location + "'" + "DELIMITER ',' QUOTE '\'\'' CSV" + header_condition + ";"; // Agregar parametrizado
         // Ejecuto la query
         cliente.execUpdate(query);
         // Verifico si se terminaron de cargar los datos mediante el comando COPY
         for (int i = 1; i < 11; i++) { // Durante 10 segundos, cada un segundo
-            String query2 = "SELECT COUNT(pk_id_user) FROM " + tabla;
+            String query2 = "SELECT COUNT(*) FROM " + tabla; // No contar sobre la pkid porque podria no exisit
             ResultSet rs = cliente.execQuery(query2);
             if(rs.next()){
                 rs.getInt(1);
-                if(rs.getInt(1) == csv.getCantidadRegistros()){ // Se insertaron todos los registros
-                    procesoCompletado = true;
+                if(rs.getInt(1) == csv.getCantidadRegistros()){ // Cantidad de registros en la tabla vs cantidad de registros del .csv
+                    procesoCompletado = true; // Se terminaron de cargar todos los registros
                     break;
                 }
             }
             Thread.sleep(1000);
         }
-        if(procesoCompletado){
+        if(procesoCompletado){ // Si se cargaron todos los registros, cargo en la tabla auxiliar
             query = "INSERT INTO " + tabla_aux + "(porcentaje,cantidad_registros,fecha_procesamiento) VALUES (" + csv.getPorcentaje() + "," + csv.getCantidadRegistros() + ",CURRENT_TIMESTAMP(2));";
             cliente.execUpdate(query);
             return true;
@@ -63,11 +73,16 @@ public class Expert {
         }
     }
     
-    public boolean moverCSV(CSV csv) throws IOException{
+    /**
+    * Se encarga de mover y renombrar el .csv al directorio correspondiente al finalizar la carga
+    * @param csv CSV, dtoConfig DTOConfig
+    * @return boolean
+    */
+    public boolean moverCSV(CSV csv,DTOConfig dtoConfig) throws IOException{
         
         // Obtengo los valores del archivo de propiedades
         String csv_path = csv.getFullPath();
-        String csv_location_old = properties.getPropValue("csv_location_old");
+        String csv_location_old = dtoConfig.getCsv_location_old();
         
         // Muevo .csv a otro directorio
         Path source = Paths.get(csv_path);
@@ -82,23 +97,43 @@ public class Expert {
         return true;
     }
     
-    public CSV verificarCSV(PostgresHelper cliente, CSV csv) throws FileNotFoundException, IOException, SQLException{       
+    /**
+    * Esta funcion verifica que el contenido del .csv cumpla con el formato establecido para su carga
+    * @param cliente PostgresHelper, csv CSV, dtoConfig DTOConfig
+    * @return boolean
+    */
+    public CSV verificarCSV(PostgresHelper cliente, CSV csv, DTOConfig dtoConfig) throws FileNotFoundException, IOException, SQLException{       
         
+        // Valores utilizados en la función
         String csv_path = csv.getFullPath();
-        String encoding = properties.getPropValue("encoding");
-        String[] nombres_columnas = properties.getPropValue("columns").split(",");
-        String[] nombres_columnas_req = properties.getPropValue("columns_required").split(",");
-        
-        // Siguiente paso, verificar el contenido del csv (cantidad de campos y obligatoriedad de los mismos)
+        String encoding = dtoConfig.getEncoding();
+        String[] nombres_columnas = dtoConfig.getColumns().split(",");
+        String[] nombres_columnas_req = dtoConfig.getColumns_required().split(",");
+        boolean incluir_columnas = dtoConfig.isInclude_columns();
         BufferedReader br = new BufferedReader(new InputStreamReader(new FileInputStream(csv_path), encoding));
         String line;
         int lineNumber = 0;
+        
+        // Por cada linea del archivo .csv
         while((line=br.readLine())!=null){
             lineNumber++;
-            String l = line.trim();
-            ArrayList<String> columnas = cantidadColumnas(l);
+            String line_trim = line.trim();
+            // En caso de incluir el encabezado, verifico que conicida con las columnas con lo definido en el archivo de configuraciones
+            if((incluir_columnas) && (lineNumber < 2)){
+                String[] campos_header = line.split(",");
+                if(!Arrays.equals(campos_header, nombres_columnas)){
+                    csv.setIsValid(false);
+                    String mensajeError = "No coinciden los nombres de las columnas con los del encabezado del archivo .csv";
+                    csv.setIsValid_motive(mensajeError);
+                    return csv;
+                }
+                continue;
+            }
+            
+            ArrayList<String> columnas = obtenerColumnas(line_trim, dtoConfig); // Obtengo ArrayList con los campos (columnas) que existen en esta línea
             int cantidad_columnas = columnas.size();
             if (cantidad_columnas == nombres_columnas.length){ // Deben ser la cantidad de campos definida en el archivo de config
+                // Compruebo que para los valores requeridos existan datos
                 HashMap<String,String> hashColumns = new HashMap<>();
                 ArrayList<String> col_req_noVal = new ArrayList();
                 for(int i=0; i < nombres_columnas.length; i++){
@@ -114,7 +149,7 @@ public class Expert {
                 }
                 if(col_req_noVal.size() > 0){
                     csv.setIsValid(false);
-                    String mensajeError = "Los siguientes campos requeridos no poseen valor, para los registros en las filas:";
+                    String mensajeError = "Los siguientes campos requeridos no poseen valor para los registros en las filas:";
                     for(int i = 0; i < col_req_noVal.size(); i++){
                         mensajeError += "\n" + lineNumber + " - " + col_req_noVal.get(i);
                     }
@@ -128,14 +163,20 @@ public class Expert {
                 return csv;
             }
         }
-        csv.setCantidadRegistros(lineNumber);
+        
+        // Si en el .csv se incluye el header, la cantidad de registros se debe disminuir en 1
+        if(incluir_columnas){
+            csv.setCantidadRegistros(lineNumber -1);
+        } else {
+            csv.setCantidadRegistros(lineNumber);
+        }
         br.close();
         
         // Verificación de cantidad de registros, en comparación con los registros anteriores en la tabla
         // Verificar si el porcentaje de tolerancia de bajas se cumple
         // Obtengo de la tabla auxiliar la cantidad de registros cargados en la última ejecución
         int cantidadRegistrosTabla = 0;
-        String query_latestRecords = "SELECT cantidad_registros FROM auxiliar ORDER BY fecha_procesamiento DESC LIMIT 1;";
+        String query_latestRecords = "SELECT cantidad_registros FROM auxiliar ORDER BY fecha_procesamiento DESC LIMIT 1;"; // especificar el esquema y revisar
         ResultSet rs = cliente.execQuery(query_latestRecords);
         if(rs.next()){
             cantidadRegistrosTabla = rs.getInt(1);
@@ -160,10 +201,15 @@ public class Expert {
         return csv;
     }
     
-    public ArrayList cantidadColumnas(String cadena) throws IOException{
+    /**
+    * Recibe una línea (Str) del .csv, y lo divide en los campos
+    * @param cadena String, dtoConfig DTOConfig
+    * @return ArrayList con los diferentes campos que posee una línea del .csv
+    */
+    public ArrayList obtenerColumnas(String cadena, DTOConfig dtoConfig) throws IOException{
         
-        char caracter_delimitador = properties.getPropValue("quotes_char").charAt(0);
-        char caracter_separador = properties.getPropValue("separator_char").charAt(0);
+        char caracter_delimitador = dtoConfig.getQuotes_char();
+        char caracter_separador = dtoConfig.getSeparator_char();
         boolean flag_conteo = true;
         String palabra = "";
         ArrayList<String> valores = new ArrayList();
@@ -202,15 +248,17 @@ public class Expert {
         return valores;
     }
     
-    public CSV verificarExistenciaCSV() throws IOException{
+    /**
+    * Se comprueba que exista un .csv a procesar, de ser así se crea un objeto del tipo
+    * CSV, donde se cargan los parametros principales del mismo utilizados en el proceso de carga
+    * @param dtoConfig DTOConfig
+    * @return CSV objeto con los datos principales utilizados en el procesamiento del mismo
+    */
+    public CSV verificarExistenciaCSV(DTOConfig dtoConfig){
         
         // Obtengo los valores del archivo de propiedades
         String csv_location = "";
-        try{
-            csv_location = properties.getPropValue("csv_location");
-        } catch (IOException e){
-            throw e;
-        }
+        csv_location = dtoConfig.getCsv_location();
         int cantidadCSV = 0;
         String nombreCSV = "";
         
@@ -241,17 +289,28 @@ public class Expert {
         }
     }
     
+    /**
+    * Verifica y carga las configuraciones almacenadas en el .properties.
+    * @return DTOConfig
+    */
     public DTOConfig verificarEstadoConfig() throws IOException{
         try{
             if(properties.getPropValues()){
-                String[] addresses = properties.getPropValue("columns").split(",");
+                
                 return new DTOConfig(   properties.getPropValue("db_name"),
                                         properties.getPropValue("csv_location"),
                                         properties.getPropValue("csv_name"),
                                         properties.getPropValue("csv_location_old"),
+                                        properties.getPropValue("log_location"),
                                         properties.getPropValue("intermediate_table"),
                                         properties.getPropValue("aux_table"),
-                                        addresses);
+                                        properties.getPropValue("columns"),
+                                        properties.getPropValue("columns_required"),
+                                        properties.getPropValue("encoding"),
+                                        properties.getPropValue("mail_addresses"),
+                                        properties.getPropValue("include_columns"),
+                                        properties.getPropValue("separator_char"),
+                                        properties.getPropValue("quotes_char"));
             } else {
                 return null;
             }

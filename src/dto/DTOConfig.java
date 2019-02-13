@@ -7,20 +7,74 @@ public class DTOConfig {
     private String csv_location;
     private String csv_name;
     private String csv_location_old;
+    private String log_location;
     private String tabla_intermedia;
     private String tabla_auxiliar;
+    private String columns;
+    private String columns_required;
+    private String encoding;
     private String[] addresses;
+    private boolean include_columns;
+    private char separator_char;
+    private char quotes_char;
 
-    public DTOConfig(String db_name, String csv_location, String csv_name, String csv_location_old, String tabla_intermedia, String tabla_auxiliar, String[] addresses) {
+    public DTOConfig(String db_name, String csv_location, String csv_name, String csv_location_old, String log_location, String tabla_intermedia, String tabla_auxiliar,String columns, String columns_required, String encoding, String addresses, String include_columns, String separator_char, String quotes_char) {
         this.db_name = db_name;
         this.csv_location = csv_location;
+        this.log_location = log_location;
         this.csv_name = csv_name;
         this.csv_location_old = csv_location_old;
         this.tabla_intermedia = tabla_intermedia;
         this.tabla_auxiliar = tabla_auxiliar;
-        this.addresses = addresses;
+        this.columns = columns;
+        this.columns_required = columns_required;
+        this.encoding = encoding;
+        this.addresses = addresses.split(",");
+        this.include_columns = Boolean.parseBoolean(include_columns);
+        this.separator_char = separator_char.charAt(0);
+        this.quotes_char = quotes_char.charAt(0);
     }
 
+    public char getSeparator_char() {
+        return separator_char;
+    }
+
+    public void setSeparator_char(char separator_char) {
+        this.separator_char = separator_char;
+    }
+
+    public char getQuotes_char() {
+        return quotes_char;
+    }
+
+    public void setQuotes_char(char quotes_char) {
+        this.quotes_char = quotes_char;
+    }
+
+    public boolean isInclude_columns() {
+        return include_columns;
+    }
+
+    public void setInclude_columns(boolean include_columns) {
+        this.include_columns = include_columns;
+    }
+    
+    public String getColumns() {
+        return columns;
+    }
+
+    public void setColumns(String columns) {
+        this.columns = columns;
+    }
+
+    public String getLog_location() {
+        return log_location;
+    }
+
+    public void setLog_location(String log_location) {
+        this.log_location = log_location;
+    }
+    
     public String[] getAddresses() {
         return addresses;
     }
@@ -76,5 +130,21 @@ public class DTOConfig {
     public void setTabla_auxiliar(String tabla_auxiliar) {
         this.tabla_auxiliar = tabla_auxiliar;
     }
-    
+
+    public String getColumns_required() {
+        return columns_required;
+    }
+
+    public void setColumns_required(String columns_required) {
+        this.columns_required = columns_required;
+    }
+
+    public String getEncoding() {
+        return encoding;
+    }
+
+    public void setEncoding(String encoding) {
+        this.encoding = encoding;
+    }
+      
 }

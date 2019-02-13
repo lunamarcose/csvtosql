@@ -27,7 +27,7 @@ public class GetPropertyValues {
                         throw new FileNotFoundException("property file '" + propFileName + "' not found in the classpath");
                 }
                 
-                String[] parametros = {"csv_location_old","intermediate_table","columns","columns_required","include_columns","separator_char","quotes_char","encoding","tolerance_percentage","aux_table"};
+                String[] parametros = {"csv_location_old","intermediate_table","columns","columns_required","include_columns","separator_char","quotes_char","encoding","tolerance_percentage","aux_table","mail_addresses"};
                 for (int i = 0; i < parametros.length; i++) {
                     String valor = prop.getProperty(parametros[i]);
                     if(valor == ""){
