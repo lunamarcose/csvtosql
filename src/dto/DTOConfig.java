@@ -1,11 +1,8 @@
-
 package dto;
-
 
 public class DTOConfig {
     private String db_name;
     private String csv_location;
-    private String csv_name;
     private String csv_location_old;
     private String log_location;
     private String tabla_intermedia;
@@ -17,12 +14,22 @@ public class DTOConfig {
     private boolean include_columns;
     private char separator_char;
     private char quotes_char;
-
-    public DTOConfig(String db_name, String csv_location, String csv_name, String csv_location_old, String log_location, String tabla_intermedia, String tabla_auxiliar,String columns, String columns_required, String encoding, String addresses, String include_columns, String separator_char, String quotes_char) {
+    private boolean notification_flag;
+    private String notification_subject;
+    private boolean isValid;
+    private String isValidMotive;
+    private boolean pre_verification;
+    private double tolerance_percentage;
+    
+    // Carga de valores de configuración
+    public void cargarValores(String db_name, String csv_location, String csv_location_old, 
+            String log_location, String tabla_intermedia, String tabla_auxiliar, 
+            String columns, String columns_required, String encoding, String addresses, 
+            String include_columns, String separator_char, String quotes_char, 
+            String notification_flag, String notification_subject, String pre_verification, String tolerance_percentage) {
         this.db_name = db_name;
         this.csv_location = csv_location;
         this.log_location = log_location;
-        this.csv_name = csv_name;
         this.csv_location_old = csv_location_old;
         this.tabla_intermedia = tabla_intermedia;
         this.tabla_auxiliar = tabla_auxiliar;
@@ -33,6 +40,63 @@ public class DTOConfig {
         this.include_columns = Boolean.parseBoolean(include_columns);
         this.separator_char = separator_char.charAt(0);
         this.quotes_char = quotes_char.charAt(0);
+        this.notification_flag = Boolean.parseBoolean(notification_flag);
+        this.notification_subject = notification_subject;
+        this.pre_verification = Boolean.parseBoolean(pre_verification);
+        this.tolerance_percentage = Double.parseDouble(tolerance_percentage);
+    }
+    
+    // Se inicializa como valido
+    public DTOConfig(){
+        this.isValid = true;
+    }
+
+    public double getTolerance_percentage() {
+        return tolerance_percentage;
+    }
+
+    public void setTolerance_percentage(double tolerance_percentage) {
+        this.tolerance_percentage = tolerance_percentage;
+    }
+
+    public boolean isPre_verification() {
+        return pre_verification;
+    }
+
+    public void setPre_verification(String pre_verification) {
+        this.pre_verification = Boolean.parseBoolean(pre_verification);
+    }
+    
+    public boolean isIsValid() {
+        return isValid;
+    }
+
+    public void setIsValid(boolean isValid) {
+        this.isValid = isValid;
+    }
+
+    public String getIsValidMotive() {
+        return isValidMotive;
+    }
+
+    public void setIsValidMotive(String isValidMotive) {
+        this.isValidMotive = isValidMotive;
+    }
+    
+    public boolean isNotification_flag() {
+        return notification_flag;
+    }
+
+    public void setNotification_flag(boolean notification_flag) {
+        this.notification_flag = notification_flag;
+    }
+
+    public String getNotification_subject() {
+        return notification_subject;
+    }
+
+    public void setNotification_subject(String notification_subject) {
+        this.notification_subject = notification_subject;
     }
 
     public char getSeparator_char() {
@@ -97,14 +161,6 @@ public class DTOConfig {
 
     public void setCsv_location(String csvl_location) {
         this.csv_location = csvl_location;
-    }
-
-    public String getCsv_name() {
-        return csv_name;
-    }
-
-    public void setCsv_name(String csv_name) {
-        this.csv_name = csv_name;
     }
 
     public String getCsv_location_old() {

@@ -17,7 +17,6 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.logging.SimpleFormatter;
 import javax.mail.MessagingException;
-import javax.mail.internet.InternetAddress;
 import notification.MailSender;
 
 
@@ -27,31 +26,8 @@ public class Controller {
     private Expert experto = new Expert();
     private CSV csv;
     private DTOConfig dtoConfig;
-    private MailSender sender;
-    private InternetAddress addresses;
-    private String email_subjet;
-    private ArrayList<String> email_content = new ArrayList();
     private final static Logger LOGGER = Logger.getLogger("csvtosql.App");
-
-    public String getEmail_subjet() {
-        return email_subjet;
-    }
-
-    public void setEmail_subjet(String email_subjet) {
-        this.email_subjet = "Proceso de Importación de datos - " + email_subjet;
-    }
-
-    public String getEmail_content() {
-        String contenido = "";
-        for (int i = 0; i < this.email_content.size(); i++) {
-            contenido += this.email_content.get(i);
-        }
-        return contenido;
-    }
-
-    public void setEmail_content(String email_content) {
-        this.email_content.add(email_content);
-    }
+    private Email notification;
     
     /**
     * Controla los pasos a seguir durante el procedimiento  de carga
@@ -61,24 +37,40 @@ public class Controller {
         startLogger();
         // Verificamos el archivo de configuraciones
         if(verificarEstadoConfig()){ // El archivo de configuración posee todos los datos cargados
+            // Inicialización de notificaciones
+            inicializarNotificaciones();
             // Verificamos exista el csv a procesar
             // Si existe, devuelve el objeto
             this.csv = verificarExistenciaCSV();
             if(csv != null){ // Existe el csv a procesar
                 // Verificamos conexión con la DB
                 if(conectar()){ // Conectado OK
-                    // Verificamos el contenido del .csv
-                    if(verificarCSV(cliente,csv)){ // CSV correcto
-                        // Se procede a cargar el .csv
+                    // Puede realizarse una verificación externa del contenido del .csv
+                    // Esto omite la verificación que se realiza en la propia aplicación
+                    // Y directamente se procede con la carga
+                    if(dtoConfig.isPre_verification()){
+                        // Se carga el .csv sin ser verificado
                         if(cargarCSV(csv)){
                             // Se mueve el csv al directorio de históricos
                             moverCSV(csv);
                         }
+                    } else { // Se debe realizar la verificación del csv
+                        // Verificamos el contenido del .csv
+                        if(verificarCSV(cliente,csv)){ // CSV correcto
+                            // Se procede a cargar el .csv
+                            if(cargarCSV(csv)){
+                                // Se mueve el csv al directorio de históricos
+                                moverCSV(csv);
+                            }
+                        }
                     }
                 }
             }
+            // Si las notificaciones están habilitadas, notifica
+            if(this.notification.isEnabled()){
+                notificar();
+            }
         }
-        notificar();
     }
     
     /**
@@ -118,15 +110,15 @@ public class Controller {
                 return true;
             } else {
                 LOGGER.log(Level.WARNING, "No se ha podido conectar a la DB");
-                setEmail_subjet("Error");
-                setEmail_content("No se ha podido conectar a la DB");
+                notification.setEmail_subjet("Error");
+                notification.setEmail_content("No se ha podido conectar a la DB");
                 return false;
             }
         } catch (IOException | SQLException e){
             LOGGER.log(Level.SEVERE, "ERROR: No se ha podido conectar a la DB");
             LOGGER.log(Level.SEVERE, Controller.getStackTrace(e));
-            setEmail_subjet("Error");
-            setEmail_content("No se ha podido conectar a la DB: " + Controller.getStackTrace(e));
+            notification.setEmail_subjet("Error");
+            notification.setEmail_content("No se ha podido conectar a la DB: " + Controller.getStackTrace(e));
             return false;
         }
     }
@@ -144,14 +136,14 @@ public class Controller {
             } catch (SQLException e){
                 LOGGER.log(Level.SEVERE, "ERROR: No se ha podido conectar a la DB");
                 LOGGER.log(Level.SEVERE, Controller.getStackTrace(e));
-                setEmail_subjet("Error");
-                setEmail_content("No se ha podido desconectar de la DB: " + Controller.getStackTrace(e));
+                notification.setEmail_subjet("Error");
+                notification.setEmail_content("No se ha podido desconectar de la DB: " + Controller.getStackTrace(e));
                 return false;
             }
         }
         LOGGER.log(Level.WARNING, "No se ha podido desconectar de la DB");
-        setEmail_subjet("Error");
-        setEmail_content("No se ha podido desconectar de la DB: ");
+        notification.setEmail_subjet("Error");
+        notification.setEmail_content("No se ha podido desconectar de la DB: ");
         return false;
     }
 
@@ -166,22 +158,22 @@ public class Controller {
             try{
                 if(this.experto.cargarCSV(this.cliente, csv,dtoConfig)){
                     LOGGER.log(Level.INFO, "Se ha cargado correctamente el .csv");
-                    setEmail_subjet("Operación completada");
-                    setEmail_content("Se han cargado correctamente los " + csv.getCantidadRegistros() + " registros del archivo .csv. ");
+                    notification.setEmail_subjet("Operación completada");
+                    notification.setEmail_content("Se han cargado correctamente los " + csv.getCantidadRegistros() + " registros del archivo .csv. ");
                     desconectar();
                     return true;
                 } else {
                     LOGGER.log(Level.SEVERE, "No se ha cargado el .csv en su totalidad, o existen datos previos sin procesar. Favor contacte soporte.");
-                    setEmail_subjet("Error");
-                    setEmail_content("No se ha cargado el .csv en su totalidad, o existen datos previos sin procesar. Favor contacte soporte.");
+                    notification.setEmail_subjet("Error");
+                    notification.setEmail_content("No se ha cargado el .csv en su totalidad, o existen datos previos sin procesar. Favor contacte soporte.");
                     desconectar();
                     return false;
                 }
             } catch (IOException | InterruptedException | SQLException e){
                 LOGGER.log(Level.SEVERE, "ERROR: No se ha podido cargar el .csv");
                 LOGGER.log(Level.SEVERE, Controller.getStackTrace(e));
-                setEmail_subjet("Error");
-                setEmail_content("ERROR: No se ha podido cargar el .csv " + Controller.getStackTrace(e));
+                notification.setEmail_subjet("Error");
+                notification.setEmail_content("ERROR: No se ha podido cargar el .csv " + Controller.getStackTrace(e));
                 return false;
             }
         }
@@ -203,15 +195,15 @@ public class Controller {
                 return true;
             } else {
                 LOGGER.log(Level.WARNING, "No se ha podido mover el .csv");
-                setEmail_subjet("Operación parcialmente  completada");
-                setEmail_content(" Se informa que no se ha podido mover el .csv. Favor contacte soporte para regularizar la situación.");
+                notification.setEmail_subjet("Operación parcialmente  completada");
+                notification.setEmail_content(" Se informa que no se ha podido mover el .csv. Favor contacte soporte para regularizar la situación.");
                 return false;
             }
         } catch (IOException e){
             LOGGER.log(Level.SEVERE, "ERROR: No se ha podido mover el .csv");
             LOGGER.log(Level.SEVERE, Controller.getStackTrace(e));
-            setEmail_subjet("Operación parcialmente  completada");
-            setEmail_content(" Se informa que no se ha podido mover el .csv. Favor contacte soporte para regularizar la situación. " + Controller.getStackTrace(e));
+            notification.setEmail_subjet("Operación parcialmente  completada");
+            notification.setEmail_content(" Se informa que no se ha podido mover el .csv. Favor contacte soporte para regularizar la situación. " + Controller.getStackTrace(e));
             return false;
         }
     }
@@ -229,15 +221,15 @@ public class Controller {
             if(estadoCSV){
                 LOGGER.log(Level.INFO, "El csv tiene el formato adecuado");
             } else {
-                LOGGER.log(Level.WARNING, "El csv no cumple con el formato establecido: " + csv.getIsValid_motive());
-                setEmail_subjet("Error");
-                setEmail_content(" El csv no cumple con el formato establacido: " + csv.getIsValid_motive());
+                LOGGER.log(Level.WARNING, "El .csv no puede ser procesado debido al siguiente motivo: " + csv.getIsValid_motive());
+                notification.setEmail_subjet("Error");
+                notification.setEmail_content("El .csv no puede ser procesado debido al siguiente motivo: " + csv.getIsValid_motive());
             }
         } catch(IOException | SQLException e){
             LOGGER.log(Level.SEVERE, "ERROR: No se ha podido conectar a la DB");
             LOGGER.log(Level.SEVERE, Controller.getStackTrace(e));
-            setEmail_subjet("Error");
-            setEmail_content(" No se ha podido conectar a la DB" + Controller.getStackTrace(e));
+            notification.setEmail_subjet("Error");
+            notification.setEmail_content(" No se ha podido conectar a la DB" + Controller.getStackTrace(e));
             return estadoCSV;
         }
         return estadoCSV;
@@ -255,9 +247,9 @@ public class Controller {
         if(csv!=null){
             LOGGER.log(Level.INFO, "Se ha detectado un .csv a procesar en la ruta: " + dtoConfig.getCsv_location() );
         } else {
-            LOGGER.log(Level.WARNING, "No se pudo procesar el .csv. Verifique que exista y no se encuentren varios .csv en la ruta: " + dtoConfig.getCsv_location());
-            setEmail_subjet("Error");
-            setEmail_content(" No se pudo procesar el .csv. Verifique que exista y no se encuentren varios .csv en la ruta: : " + dtoConfig.getCsv_location());
+            LOGGER.log(Level.WARNING, "No se pudo procesar el .csv. Esto puede deberse a que el mismo no exista, o se encuentre más de un .csv en la ruta: " + dtoConfig.getCsv_location());
+            notification.setEmail_subjet("Error");
+            notification.setEmail_content("No se pudo procesar el .csv. Esto puede deberse a que el mismo no exista, o se encuentre más de un .csv en la ruta: " + dtoConfig.getCsv_location());
         }
         return csv;
     }
@@ -270,21 +262,17 @@ public class Controller {
         LOGGER.log(Level.INFO, "Verificando el archivo de configuraciones...");
         try{
             DTOConfig dto = experto.verificarEstadoConfig();
-            if(dto != null){
+            if(dto.isIsValid()){
                 this.dtoConfig = dto;
                 LOGGER.log(Level.INFO, "El archivo de configuración fue validado exitosamente");
                 return true;
             } else {
-                LOGGER.log(Level.WARNING, "Debe completar todos los valores del archivo de configuración");
-                setEmail_subjet("Error");
-                setEmail_content(" Debe completar todos los valores del archivo de configuración");
+                LOGGER.log(Level.WARNING, dto.getIsValidMotive());
                 return false;
             }
         } catch (Exception e){
             LOGGER.log(Level.SEVERE, "ERROR: No se puede leer correctamente el archivo de configuración");
             LOGGER.log(Level.SEVERE, Controller.getStackTrace(e));
-            setEmail_subjet("Error");
-            setEmail_content(" No se puede leer correctamente el archivo de configuración" + Controller.getStackTrace(e));
             return false;
         }
         
@@ -302,20 +290,22 @@ public class Controller {
         e.printStackTrace(pWriter);
         return sWriter.toString();
     }
-
+    
+    /**
+     * Se inicializa el objeto de notificaciones con los valores del archivo de configuración
+     */
+    public void inicializarNotificaciones(){
+        this.notification = new Email(this.dtoConfig.isNotification_flag(), this.dtoConfig.getAddresses(), this.dtoConfig.getNotification_subject());
+    }
+    
     /**
     * Envía notificaciones una vez finalizado el proceso de carga,
     * ya sea exitoso o no y ante un error inesperado.
     */
     public void notificar(){
-        this.sender = new MailSender();
-        this.addresses = new InternetAddress();
-        String [] destinatarios = dtoConfig.getAddresses();
-        for (int i = 0; i < destinatarios.length; i++) {
-            addresses.setAddress(destinatarios[i]);
-        }
+        this.notification.setSender(new MailSender());
         try {
-            sender.systemSender(addresses, this.getEmail_subjet(), this.getEmail_content());
+            this.notification.getSender().systemSender(notification.getAddresses(), notification.getEmail_subjet(), notification.getEmail_content());
         } catch (IOException | MessagingException e) {
             LOGGER.log(Level.SEVERE, "ERROR: No se pudo enviar notificaciones");
             LOGGER.log(Level.SEVERE, Controller.getStackTrace(e));

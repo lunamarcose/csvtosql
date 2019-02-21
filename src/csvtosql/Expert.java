@@ -37,6 +37,8 @@ public class Expert {
         String columnas = dtoConfig.getColumns();
         String tabla_columnas = tabla + "(" +columnas + ")";
         String location = csv.getFullPath();
+        char separatorChar = dtoConfig.getSeparator_char();
+        char quotesChar = dtoConfig.getQuotes_char();
         boolean procesoCompletado = false;
         boolean incluir_columnas = Boolean.parseBoolean(properties.getPropValue("include_columns"));
         String header_condition = "";
@@ -44,33 +46,39 @@ public class Expert {
             header_condition = " HEADER"; // Se agrega al comando copy en caso de incluir encabezados
         }
         
-        // Se debe reiniciar la clave incremental antes de copiar el csv
-        //String query = "ALTER SEQUENCE idmhr.intermedia_pk_id_user_seq RESTART WITH 1"; -> Esto lo tiene que hacer desde el lado de la DB
-        //cliente.execUpdate(query);
-        // Query para ejecutar el copy
-        String query = "COPY " + tabla_columnas + " FROM " + "'" + location + "'" + "DELIMITER ',' QUOTE '\'\'' CSV" + header_condition + ";"; // Agregar parametrizado
-        // Ejecuto la query
-        cliente.execUpdate(query);
-        // Verifico si se terminaron de cargar los datos mediante el comando COPY
-        for (int i = 1; i < 11; i++) { // Durante 10 segundos, cada un segundo
-            String query2 = "SELECT COUNT(*) FROM " + tabla; // No contar sobre la pkid porque podria no exisit
-            ResultSet rs = cliente.execQuery(query2);
-            if(rs.next()){
-                rs.getInt(1);
-                if(rs.getInt(1) == csv.getCantidadRegistros()){ // Cantidad de registros en la tabla vs cantidad de registros del .csv
-                    procesoCompletado = true; // Se terminaron de cargar todos los registros
-                    break;
+        // Antes de cargar los valores a la tabla intermedia, debo verificar que se hayan procesado correctamente los anteriores
+        // Query para encontrar los campos que NO han sido procesados correctamente en la tabla intermedia, debe devolver vacío para continuar con la carga
+        //String queryNoCopiados = "SELECT COUNT (*) FROM " + tabla + "WHERE flag_registro_copiado != 't'";
+        String queryNoCopiados = "SELECT * FROM tabla_intermedia WHERE flag_registro_copiado IS NULL";
+        ResultSet rs1 = cliente.execQuery(queryNoCopiados);
+        if (!rs1.next()){
+            // Vacio la tabla de usuarios antes de la siguiente ejecución
+            String queryDelete = "DELETE FROM " + tabla;
+            cliente.execUpdate(queryDelete);
+            // Query para ejecutar el copy
+            String queryCopy = "COPY " + tabla_columnas + " FROM " + "'" + location + "'" + "DELIMITER '" + separatorChar +"' QUOTE '"+ quotesChar + quotesChar +"' CSV" + header_condition + ";"; // Agregar parametrizado
+            // Ejecuto la query
+            cliente.execUpdate(queryCopy);
+            // Verifico si se terminaron de cargar los datos mediante el comando COPY
+            for (int i = 1; i < 11; i++) { // Durante 10 segundos, cada un segundo
+                String query2 = "SELECT COUNT(*) FROM " + tabla;
+                ResultSet rs = cliente.execQuery(query2);
+                if(rs.next()){
+                    rs.getInt(1);
+                    if(rs.getInt(1) == csv.getCantidadRegistros()){ // Cantidad de registros en la tabla vs cantidad de registros del .csv
+                        procesoCompletado = true; // Se terminaron de cargar todos los registros
+                        break;
+                    }
                 }
+                Thread.sleep(1000);
             }
-            Thread.sleep(1000);
+            if(procesoCompletado){ // Si se cargaron todos los registros, cargo en la tabla auxiliar
+                String queryAux = "INSERT INTO " + tabla_aux + "(porcentaje_bajas_calculado,porcentaje_bajas_tolerado,cantidad_registros_cargados,fecha_procesamiento) VALUES (" + csv.getPorcentaje() + "," + dtoConfig.getTolerance_percentage() + "," + csv.getCantidadRegistros() + ",CURRENT_TIMESTAMP(2));";
+                cliente.execUpdate(queryAux);
+                return true;
+            }
         }
-        if(procesoCompletado){ // Si se cargaron todos los registros, cargo en la tabla auxiliar
-            query = "INSERT INTO " + tabla_aux + "(porcentaje,cantidad_registros,fecha_procesamiento) VALUES (" + csv.getPorcentaje() + "," + csv.getCantidadRegistros() + ",CURRENT_TIMESTAMP(2));";
-            cliente.execUpdate(query);
-            return true;
-        } else {
-            return false;
-        }
+        return false;
     }
     
     /**
@@ -176,7 +184,7 @@ public class Expert {
         // Verificar si el porcentaje de tolerancia de bajas se cumple
         // Obtengo de la tabla auxiliar la cantidad de registros cargados en la última ejecución
         int cantidadRegistrosTabla = 0;
-        String query_latestRecords = "SELECT cantidad_registros FROM auxiliar ORDER BY fecha_procesamiento DESC LIMIT 1;"; // especificar el esquema y revisar
+        String query_latestRecords = "SELECT cantidad_registros_cargados FROM auxiliar ORDER BY fecha_procesamiento DESC LIMIT 1;"; // especificar el esquema y revisar
         ResultSet rs = cliente.execQuery(query_latestRecords);
         if(rs.next()){
             cantidadRegistrosTabla = rs.getInt(1);
@@ -193,6 +201,7 @@ public class Expert {
             // Si es mayor al porcentaje de tolerancia no se debe procesar
             if(porcentaje > tolerancia){
                 csv.setIsValid(false);
+                csv.setIsValid_motive("No se cumple el porcentaje de bajas definido por configuración. Procentaje definido: " + tolerancia + ", porcentaje calculado: " + porcentaje);
                 return csv;
             }
         }
@@ -278,6 +287,7 @@ public class Expert {
             return null;
         }
         
+        // No pueden exisitr más de un archivo .csv en el directorio
         if(cantidadCSV > 1){
             return null;
         } else if (cantidadCSV == 1){
@@ -295,25 +305,27 @@ public class Expert {
     */
     public DTOConfig verificarEstadoConfig() throws IOException{
         try{
-            if(properties.getPropValues()){
-                
-                return new DTOConfig(   properties.getPropValue("db_name"),
-                                        properties.getPropValue("csv_location"),
-                                        properties.getPropValue("csv_name"),
-                                        properties.getPropValue("csv_location_old"),
-                                        properties.getPropValue("log_location"),
-                                        properties.getPropValue("intermediate_table"),
-                                        properties.getPropValue("aux_table"),
-                                        properties.getPropValue("columns"),
-                                        properties.getPropValue("columns_required"),
-                                        properties.getPropValue("encoding"),
-                                        properties.getPropValue("mail_addresses"),
-                                        properties.getPropValue("include_columns"),
-                                        properties.getPropValue("separator_char"),
-                                        properties.getPropValue("quotes_char"));
-            } else {
-                return null;
+            DTOConfig dto = properties.getPropValues();
+            if(dto.isIsValid()){
+                dto.cargarValores(properties.getPropValue("db_name"),
+                properties.getPropValue("csv_location"),
+                properties.getPropValue("csv_location_old"),
+                properties.getPropValue("log_location"),
+                properties.getPropValue("intermediate_table"),
+                properties.getPropValue("aux_table"),
+                properties.getPropValue("columns"),
+                properties.getPropValue("columns_required"),
+                properties.getPropValue("encoding"),
+                properties.getPropValue("mail_addresses"),
+                properties.getPropValue("include_columns"),
+                properties.getPropValue("separator_char"),
+                properties.getPropValue("quotes_char"),
+                properties.getPropValue("notification_flag"),
+                properties.getPropValue("notification_subject"),
+                properties.getPropValue("pre_verification"),
+                properties.getPropValue("tolerance_percentage"));
             }
+            return dto;
         } catch(IOException | NullPointerException e){
             throw e;
         }
