@@ -23,7 +23,7 @@ public class GetPropertyValues {
             String propFileName = "config.properties";
 
             //inputStream = getClass().getClassLoader().getResourceAsStream(propFileName);
-            inputStream = new FileInputStream(new File("config.properties"));
+            inputStream = new FileInputStream(new File("config.properties")); // Reemplazar por una ruta válida
 
             if (inputStream != null) {
                     prop.load(inputStream);
@@ -87,13 +87,15 @@ public class GetPropertyValues {
             try {
                 Properties prop = new Properties();
                 String propFileName = "config.properties";
-                inputStream = getClass().getClassLoader().getResourceAsStream(propFileName);
+                //inputStream = getClass().getClassLoader().getResourceAsStream(propFileName);
+                inputStream = new FileInputStream(new File("config.properties")); // Reemplazar por una ruta válida
                 if (inputStream != null) {
                         prop.load(inputStream);
                 } else {
                         throw new FileNotFoundException("Archivo de configuraciones '" + propFileName + "' no ha sido encontrado en la ruta del proyecto.");
-                }       
-                String cfg_file_loc = prop.getProperty("cfg_path");   
+                }
+                // Ruta al archivo de configuraciones
+                String cfg_file_loc = ("config.properties");   // Reemplazar por una ruta válida
                 this.encryptor.setPassword("PASS");   
                 Properties propEnc = new EncryptableProperties(this.encryptor);  
                 propEnc.load(new FileInputStream(cfg_file_loc));
