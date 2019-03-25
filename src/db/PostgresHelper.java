@@ -15,7 +15,7 @@ public class PostgresHelper {
 	private String user;
 	private String pass;
 	
-	//we don't like this constructor
+	// No se utiliza el constructor por defecto
 	protected PostgresHelper() {}
 	
 	public PostgresHelper(String host, String dbName, String user, String pass) throws IOException {
@@ -28,7 +28,7 @@ public class PostgresHelper {
 	
 	public boolean connect() throws SQLException, ClassNotFoundException{
 		if (host.isEmpty() || dbName.isEmpty() || user.isEmpty() || pass.isEmpty()) {
-			throw new SQLException("Database credentials missing");
+			throw new SQLException("Credenciales de conexión incompletas");
 		}
 		
 		Class.forName("org.postgresql.Driver");

@@ -1,4 +1,4 @@
-    package config;
+package config;
 
 import dto.DTOConfig;
 import java.io.FileInputStream;
@@ -26,11 +26,11 @@ public class GetPropertyValues {
             if (inputStream != null) {
                     prop.load(inputStream);
             } else {
-                    throw new FileNotFoundException("property file '" + propFileName + "' not found in the classpath");
+                    throw new FileNotFoundException("Archivo de configuraciones '" + propFileName + "' no ha sido encontrado en la ruta del proyecto.");
             }
 
             String[] parametros = {"host","port","db_name","username","csv_location_old","intermediate_table","columns","columns_required","include_columns","separator_char",
-                "quotes_char","encoding","tolerance_percentage","aux_table","mail_addresses","notification_flag"};
+                "quotes_char","encoding","tolerance_percentage","aux_table","mail_addresses","notification_flag"}; // Agregar TODOS
             String[] palabrasNoValidas = {"alter","drop","create","insert","delete"};
             for (int i = 0; i < parametros.length; i++) {
                 String valor = prop.getProperty(parametros[i]);
@@ -89,7 +89,7 @@ public class GetPropertyValues {
                 if (inputStream != null) {
                         prop.load(inputStream);
                 } else {
-                        throw new FileNotFoundException("property file '" + propFileName + "' not found in the classpath");
+                        throw new FileNotFoundException("Archivo de configuraciones '" + propFileName + "' no ha sido encontrado en la ruta del proyecto.");
                 }       
                 String cfg_file_loc = prop.getProperty("cfg_path");   
                 this.encryptor.setPassword("PASS");   

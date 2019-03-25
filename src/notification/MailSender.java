@@ -18,6 +18,5 @@ public void systemSender(InternetAddress recepients, String subject, String body
         msg.setSubject(subject);
         msg.setText(body);
         Transport.send(msg);
-        System.out.println("Email sent successfully...");
     }
 }

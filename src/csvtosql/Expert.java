@@ -18,6 +18,7 @@ import java.sql.SQLException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 
@@ -49,14 +50,14 @@ public class Expert {
         // Antes de cargar los valores a la tabla intermedia, debo verificar que se hayan procesado correctamente los anteriores
         // Query para encontrar los campos que NO han sido procesados correctamente en la tabla intermedia, debe devolver vacío para continuar con la carga
         //String queryNoCopiados = "SELECT COUNT (*) FROM " + tabla + "WHERE flag_registro_copiado != 't'";
-        String queryNoCopiados = "SELECT * FROM tabla_intermedia WHERE flag_registro_copiado IS NULL";
+        String queryNoCopiados = "SELECT * FROM " + dtoConfig.getTabla_intermedia() + " WHERE flag_registro_copiado IS NULL";
         ResultSet rs1 = cliente.execQuery(queryNoCopiados);
         if (!rs1.next()){
             // Vacio la tabla de usuarios antes de la siguiente ejecución
             String queryDelete = "DELETE FROM " + tabla;
             cliente.execUpdate(queryDelete);
             // Query para ejecutar el copy
-            String queryCopy = "COPY " + tabla_columnas + " FROM " + "'" + location + "'" + "DELIMITER '" + separatorChar +"' QUOTE '"+ quotesChar + quotesChar +"' CSV" + header_condition + ";"; // Agregar parametrizado
+            String queryCopy = "COPY " + tabla_columnas + " FROM " + "'" + location + "'" + "DELIMITER '" + separatorChar +"' QUOTE '"+ quotesChar + quotesChar +"' CSV" + header_condition + ";";
             // Ejecuto la query
             cliente.execUpdate(queryCopy);
             // Verifico si se terminaron de cargar los datos mediante el comando COPY
@@ -122,69 +123,86 @@ public class Expert {
         String line;
         int lineNumber = 0;
         
-        // Por cada linea del archivo .csv
-        while((line=br.readLine())!=null){
-            lineNumber++;
-            String line_trim = line.trim();
-            // En caso de incluir el encabezado, verifico que conicida con las columnas con lo definido en el archivo de configuraciones
-            if((incluir_columnas) && (lineNumber < 2)){
-                String[] campos_header = line.split(",");
-                if(!Arrays.equals(campos_header, nombres_columnas)){
-                    csv.setIsValid(false);
-                    String mensajeError = "No coinciden los nombres de las columnas con los del encabezado del archivo .csv";
-                    csv.setIsValid_motive(mensajeError);
-                    return csv;
+        // Es posible deshabilitar la pre verificación de contenido del .csv
+        // De igual modo debe cargarse la cantidad de registros que posee el mismo
+        if(!dtoConfig.isPre_verification()){
+            // Por cada linea del archivo .csv
+            while((line=br.readLine())!=null){
+                lineNumber++;
+                String line_trim = line.trim();
+                // En caso de incluir el encabezado, verifico que conicida con las columnas con lo definido en el archivo de configuraciones
+                if((incluir_columnas) && (lineNumber < 2)){
+                    String[] campos_header = line.split(",");
+                    if(!Arrays.equals(campos_header, nombres_columnas)){
+                        csv.setIsValid(false);
+                        String mensajeError = "No coinciden los nombres de las columnas con los del encabezado del archivo .csv";
+                        csv.setIsValid_motive(mensajeError);
+                        return csv;
+                    }
+                    continue;
                 }
-                continue;
-            }
-            
-            ArrayList<String> columnas = obtenerColumnas(line_trim, dtoConfig); // Obtengo ArrayList con los campos (columnas) que existen en esta línea
-            int cantidad_columnas = columnas.size();
-            if (cantidad_columnas == nombres_columnas.length){ // Deben ser la cantidad de campos definida en el archivo de config
-                // Compruebo que para los valores requeridos existan datos
-                HashMap<String,String> hashColumns = new HashMap<>();
-                ArrayList<String> col_req_noVal = new ArrayList();
-                for(int i=0; i < nombres_columnas.length; i++){
-                    for(int j=0; j < nombres_columnas_req.length;j++){
-                        if(nombres_columnas[i].equals(nombres_columnas_req[j])){
-                            if(!columnas.get(i).equals("")){
-                                hashColumns.put(nombres_columnas_req[j],columnas.get(i));
-                            } else {
-                                col_req_noVal.add(nombres_columnas_req[j]);
+                
+                // Se procesan los registros que contienen datos...
+                ArrayList<String> columnas = obtenerColumnas(line_trim, dtoConfig); // Obtengo ArrayList con los campos (columnas) que existen en esta línea
+                int cantidad_columnas = columnas.size();
+                if (cantidad_columnas == nombres_columnas.length){ // Deben ser la cantidad de campos definida en el archivo de config
+                    // Compruebo que para los valores requeridos existan datos
+                    HashMap<String,String> hashColumns = new HashMap<>();
+                    ArrayList<String> col_req_noVal = new ArrayList();
+                    for(int i=0; i < nombres_columnas.length; i++){
+                        for(int j=0; j < nombres_columnas_req.length;j++){
+                            if(nombres_columnas[i].equals(nombres_columnas_req[j])){
+                                if(!columnas.get(i).equals("")){
+                                    hashColumns.put(nombres_columnas_req[j],columnas.get(i));
+                                } else {
+                                    col_req_noVal.add(nombres_columnas_req[j]);
+                                }
                             }
                         }
                     }
-                }
-                if(col_req_noVal.size() > 0){
-                    csv.setIsValid(false);
-                    String mensajeError = "Los siguientes campos requeridos no poseen valor para los registros en las filas:";
-                    for(int i = 0; i < col_req_noVal.size(); i++){
-                        mensajeError += "\n" + lineNumber + " - " + col_req_noVal.get(i);
+                    if(col_req_noVal.size() > 0){
+                        csv.setIsValid(false);
+                        String mensajeError = "Los siguientes campos requeridos no poseen valor para los registros en las filas:";
+                        for(int i = 0; i < col_req_noVal.size(); i++){
+                            mensajeError += "\n" + lineNumber + " - " + col_req_noVal.get(i);
+                        }
+                        csv.setIsValid_motive(mensajeError);
+                        return csv;
                     }
+                } else {
+                    String mensajeError = "El registro " + lineNumber + " no tiene la cantidad de columnas necesarias (" + cantidad_columnas + ")\nDatos a cargar del registro "+lineNumber +": " + line_trim ;
                     csv.setIsValid_motive(mensajeError);
+                    csv.setIsValid(false);
                     return csv;
                 }
-            } else {
-                String mensajeError = "El registro " + lineNumber + " no tiene la cantidad de filas necesaria (" + cantidad_columnas + ")";
-                csv.setIsValid_motive(mensajeError);
-                csv.setIsValid(false);
-                return csv;
+            }
+            
+        } else {
+            while((line=br.readLine())!=null){
+                lineNumber++;
             }
         }
         
         // Si en el .csv se incluye el header, la cantidad de registros se debe disminuir en 1
-        if(incluir_columnas){
+        if(incluir_columnas && lineNumber >0){
             csv.setCantidadRegistros(lineNumber -1);
         } else {
             csv.setCantidadRegistros(lineNumber);
-        }
+        }   
         br.close();
+        
+        // Si la cantidad de registros del .csv es 0, quiere decir que no posee datos
+        if(csv.getCantidadRegistros() == 0){
+            csv.setIsValid(false);
+            csv.setIsValid_motive("El .csv no posee datos a cargar");
+            return csv;
+        }
         
         // Verificación de cantidad de registros, en comparación con los registros anteriores en la tabla
         // Verificar si el porcentaje de tolerancia de bajas se cumple
         // Obtengo de la tabla auxiliar la cantidad de registros cargados en la última ejecución
         int cantidadRegistrosTabla = 0;
-        String query_latestRecords = "SELECT cantidad_registros_cargados FROM auxiliar ORDER BY fecha_procesamiento DESC LIMIT 1;"; // especificar el esquema y revisar
+        String query_latestRecords = "SELECT cantidad_registros_cargados FROM " + dtoConfig.getTabla_auxiliar() + " ORDER BY fecha_procesamiento DESC LIMIT 1;"; // especificar el esquema y revisar
         ResultSet rs = cliente.execQuery(query_latestRecords);
         if(rs.next()){
             cantidadRegistrosTabla = rs.getInt(1);
@@ -201,7 +219,7 @@ public class Expert {
             // Si es mayor al porcentaje de tolerancia no se debe procesar
             if(porcentaje > tolerancia){
                 csv.setIsValid(false);
-                csv.setIsValid_motive("No se cumple el porcentaje de bajas definido por configuración. Procentaje definido: " + tolerancia + ", porcentaje calculado: " + porcentaje);
+                csv.setIsValid_motive("No se cumple el porcentaje de bajas definido por configuración. Porcentaje definido: " + tolerancia + ", porcentaje calculado: " + porcentaje);
                 return csv;
             }
         }
@@ -227,7 +245,7 @@ public class Expert {
         for (int i = 0; i < cadena.length(); i++){
             char c = cadena.charAt(i);
             if(c == caracter_delimitador){
-                if((palabra.length() > 0) && ((i == cadena.length()-1) || (""+c+cadena.charAt(i+1)).equals("\',"))){ // Fin de palabra
+                if((palabra.length() > 0) && ((i == cadena.length()-1) || (""+c+cadena.charAt(i+1)).equals("" + caracter_delimitador + caracter_separador))){ // Fin de palabra
                     valores.add(palabra);
                     palabra = "";
                 }
@@ -235,9 +253,9 @@ public class Expert {
                     flag_conteo = !flag_conteo;
                 } else if(i == cadena.length()-1) { // Es el ultimo caracter de la cadena
                         flag_conteo = !flag_conteo;
-                    } else if((""+c+cadena.charAt(i+1)).equals("\',")){ // Uno de los posibles caracteres intermedios
+                    } else if((""+c+cadena.charAt(i+1)).equals("" + caracter_delimitador + caracter_separador)){ // Uno de los posibles caracteres intermedios
                             flag_conteo = !flag_conteo;
-                        } else if((""+cadena.charAt(i-1)+c).equals(",\'")){ // Otro de los posibles caracteres intermedios
+                        } else if((""+cadena.charAt(i-1)+c).equals("" + caracter_separador + caracter_delimitador)){ // Otro de los posibles caracteres intermedios
                                 flag_conteo = !flag_conteo;
                             }
             } else {
@@ -249,7 +267,7 @@ public class Expert {
                 cantidad_columnas++;
                 if(i == 0){ // El primer item venia vacio
                     valores.add("");
-                } else if(((""+cadena.charAt(i-1)).equals(",")) || (i == cadena.length()-1)){ // Cadenas intermedias vacías
+                } else if(((""+cadena.charAt(i-1)).equals("" + caracter_separador)) || (i == cadena.length()-1)){ // Cadenas intermedias vacías
                     valores.add("");
                 }
             }
@@ -263,7 +281,7 @@ public class Expert {
     * @param dtoConfig DTOConfig
     * @return CSV objeto con los datos principales utilizados en el procesamiento del mismo
     */
-    public CSV verificarExistenciaCSV(DTOConfig dtoConfig){
+    public CSV verificarExistenciaCSV(DTOConfig dtoConfig) throws NullPointerException{
         
         // Obtengo los valores del archivo de propiedades
         String csv_location = "";
@@ -272,16 +290,20 @@ public class Expert {
         String nombreCSV = "";
         
         if(!csv_location.equals("")){
-            File folder = new File(csv_location);
-            File[] listOfFiles = folder.listFiles();
-            for (int i = 0; i < listOfFiles.length; i++) {
-                if (listOfFiles[i].isFile()) {
-                  String fileName = listOfFiles[i].getName();
-                  if(fileName.endsWith(".csv")){
-                      cantidadCSV++;
-                      nombreCSV = fileName;
-                  }
+            try{
+                File folder = new File(csv_location);
+                File[] listOfFiles = folder.listFiles();
+                for (int i = 0; i < listOfFiles.length; i++) {
+                    if (listOfFiles[i].isFile()) {
+                      String fileName = listOfFiles[i].getName();
+                      if(fileName.endsWith(".csv")){
+                          cantidadCSV++;
+                          nombreCSV = fileName;
+                      }
+                    }
                 }
+            } catch(NullPointerException e){
+                throw e;
             }
         } else {
             return null;
