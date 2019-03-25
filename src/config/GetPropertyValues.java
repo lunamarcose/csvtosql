@@ -1,6 +1,7 @@
 package config;
 
 import dto.DTOConfig;
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -21,7 +22,8 @@ public class GetPropertyValues {
             Properties prop = new Properties();
             String propFileName = "config.properties";
 
-            inputStream = getClass().getClassLoader().getResourceAsStream(propFileName);
+            //inputStream = getClass().getClassLoader().getResourceAsStream(propFileName);
+            inputStream = new FileInputStream(new File("config.properties"));
 
             if (inputStream != null) {
                     prop.load(inputStream);
