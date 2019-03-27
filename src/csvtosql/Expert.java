@@ -49,8 +49,7 @@ public class Expert {
         
         // Antes de cargar los valores a la tabla intermedia, debo verificar que se hayan procesado correctamente los anteriores
         // Query para encontrar los campos que NO han sido procesados correctamente en la tabla intermedia, debe devolver vacío para continuar con la carga
-        //String queryNoCopiados = "SELECT COUNT (*) FROM " + tabla + "WHERE flag_registro_copiado != 't'";
-        String queryNoCopiados = "SELECT * FROM " + dtoConfig.getTabla_intermedia() + " WHERE flag_registro_copiado IS NULL";
+        String queryNoCopiados = "SELECT * FROM " + dtoConfig.getTabla_intermedia() + " WHERE aux_flag_registro_copiado IS NULL";
         ResultSet rs1 = cliente.execQuery(queryNoCopiados);
         if (!rs1.next()){
             // Vacio la tabla de usuarios antes de la siguiente ejecución
