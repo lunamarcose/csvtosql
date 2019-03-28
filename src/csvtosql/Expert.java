@@ -9,6 +9,7 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -324,7 +325,7 @@ public class Expert {
     * Verifica y carga las configuraciones almacenadas en el .properties.
     * @return DTOConfig
     */
-    public DTOConfig verificarEstadoConfig() throws IOException{
+    public DTOConfig verificarEstadoConfig() throws IOException, URISyntaxException{
         try{
             DTOConfig dto = properties.getPropValues();
             if(dto.isIsValid()){
@@ -347,7 +348,7 @@ public class Expert {
                 properties.getPropValue("tolerance_percentage"));
             }
             return dto;
-        } catch(IOException | NullPointerException e){
+        } catch(IOException | NullPointerException | URISyntaxException e){
             throw e;
         }
     }

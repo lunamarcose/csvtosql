@@ -6,6 +6,7 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URISyntaxException;
 import java.util.Properties;
 import org.jasypt.encryption.pbe.StandardPBEStringEncryptor;
 import org.jasypt.properties.EncryptableProperties;
@@ -13,17 +14,20 @@ import org.jasypt.properties.EncryptableProperties;
 public class GetPropertyValues {
     
     String result = "";
+    String appName = "csvtosql.jar";
     InputStream inputStream;
     StandardPBEStringEncryptor encryptor = new StandardPBEStringEncryptor();     
 
-    public DTOConfig getPropValues() throws IOException {
+    public DTOConfig getPropValues() throws IOException, URISyntaxException {
         DTOConfig dto = new DTOConfig();
         try {
             Properties prop = new Properties();
             String propFileName = "config.properties";
 
-            //inputStream = getClass().getClassLoader().getResourceAsStream(propFileName);
-            inputStream = new FileInputStream(new File("config.properties")); // Reemplazar por una ruta válida
+            //inputStream = getClass().getClassLoader().getResourceAsStream(propFileName); // Cambiar por esta línea para usar el de los recursos
+            // String parentFolder = "/Ubicacion/archivo/config.properties"; // Modificar para probar desde el IDE
+            String parentFolder = this.getParentFolder();
+            inputStream = new FileInputStream(new File(parentFolder + propFileName)); // Reemplazar por una ruta válida
 
             if (inputStream != null) {
                     prop.load(inputStream);
@@ -82,20 +86,22 @@ public class GetPropertyValues {
         return dto;
     }
     
-    public String getPropValue(String property) throws IOException{        
+    public String getPropValue(String property) throws IOException{
         String property_value = "";
             try {
                 Properties prop = new Properties();
                 String propFileName = "config.properties";
-                //inputStream = getClass().getClassLoader().getResourceAsStream(propFileName);
-                inputStream = new FileInputStream(new File("config.properties")); // Reemplazar por una ruta válida
+                //inputStream = getClass().getClassLoader().getResourceAsStream(propFileName); // Cambiar por esta línea para usar el de los recursos
+                // String parentFolder = "/Ubicacion/archivo/config.properties"; // Modificar para probar desde el IDE
+                String parentFolder = this.getParentFolder();
+                inputStream = new FileInputStream(new File(parentFolder + propFileName)); // Reemplazar por una ruta válida
                 if (inputStream != null) {
                         prop.load(inputStream);
                 } else {
                         throw new FileNotFoundException("Archivo de configuraciones '" + propFileName + "' no ha sido encontrado en la ruta del proyecto.");
                 }
                 // Ruta al archivo de configuraciones
-                String cfg_file_loc = ("config.properties");   // Reemplazar por una ruta válida
+                String cfg_file_loc = (parentFolder + propFileName);   // Reemplazar por una ruta válida
                 this.encryptor.setPassword("PASS");   
                 Properties propEnc = new EncryptableProperties(this.encryptor);  
                 propEnc.load(new FileInputStream(cfg_file_loc));
@@ -106,5 +112,11 @@ public class GetPropertyValues {
                 inputStream.close();
             }
         return property_value;
+    }
+    
+    public String getParentFolder() throws URISyntaxException{
+        String folder = new File(GetPropertyValues.class.getProtectionDomain().getCodeSource().getLocation().toURI()).getPath();
+        int lastSlash = folder.lastIndexOf('/');
+        return folder.substring(0,lastSlash + 1);
     }
 }
