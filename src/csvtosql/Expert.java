@@ -19,7 +19,6 @@ import java.sql.SQLException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 
@@ -39,6 +38,7 @@ public class Expert {
         String columnas = dtoConfig.getColumns();
         String tabla_columnas = tabla + "(" +columnas + ")";
         String location = csv.getFullPath();
+        String encoding = dtoConfig.getEncoding();
         char separatorChar = dtoConfig.getSeparator_char();
         char quotesChar = dtoConfig.getQuotes_char();
         boolean procesoCompletado = false;
@@ -57,7 +57,7 @@ public class Expert {
             String queryDelete = "DELETE FROM " + tabla;
             cliente.execUpdate(queryDelete);
             // Query para ejecutar el copy
-            String queryCopy = "COPY " + tabla_columnas + " FROM " + "'" + location + "'" + "DELIMITER '" + separatorChar +"' QUOTE '"+ quotesChar + quotesChar +"' CSV" + header_condition + ";";
+            String queryCopy = "COPY " + tabla_columnas + " FROM " + "'" + location + "'" + "DELIMITER '" + separatorChar +"' QUOTE '"+ quotesChar + quotesChar +"' CSV" + header_condition + " ENCODING '" + encoding + "';";
             // Ejecuto la query
             cliente.execUpdate(queryCopy);
             // Verifico si se terminaron de cargar los datos mediante el comando COPY
@@ -119,6 +119,7 @@ public class Expert {
         String[] nombres_columnas = dtoConfig.getColumns().split(",");
         String[] nombres_columnas_req = dtoConfig.getColumns_required().split(",");
         boolean incluir_columnas = dtoConfig.isInclude_columns();
+        String separator_char = Character.toString(dtoConfig.getSeparator_char());
         BufferedReader br = new BufferedReader(new InputStreamReader(new FileInputStream(csv_path), encoding));
         String line;
         int lineNumber = 0;
@@ -132,7 +133,7 @@ public class Expert {
                 String line_trim = line.trim();
                 // En caso de incluir el encabezado, verifico que conicida con las columnas con lo definido en el archivo de configuraciones
                 if((incluir_columnas) && (lineNumber < 2)){
-                    String[] campos_header = line.split(",");
+                    String[] campos_header = line.split(separator_char);
                     if(!Arrays.equals(campos_header, nombres_columnas)){
                         csv.setIsValid(false);
                         String mensajeError = "No coinciden los nombres de las columnas con los del encabezado del archivo .csv";
